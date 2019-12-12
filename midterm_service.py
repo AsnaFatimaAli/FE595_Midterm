@@ -399,8 +399,15 @@ def service6_result():
 
 @app.route('/service7_result', methods = ['GET', "POST"])
 def service6_result():
-
-
+    df = pd.read_csv('movie_data.csv')
+    df = pd.DataFrame(df)
+    df = df.drop(['Unnamed: 0'], axis=1)
+    user_input = input('enter movie name')
+    search = df.loc[df['title'] == user_input]
+    print('movie belongs to category', search['group'])
+    movie_category = int(input('enter category of selected movie'))
+    print('similar movies',df.loc[df['group'] == movie_category])
+    
 
 
 @app.route('/service8_result', methods = ['GET', "POST"])
