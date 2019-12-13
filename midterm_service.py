@@ -1,39 +1,58 @@
 from collections import defaultdict
-from flask import Flask, escape, request, Response, render_template, redirect, url_for
-#from fuzzywuzzy import fuzz
+import contextlib
+from flask import Flask, escape, request, Response, render_template, redirect, url_for, send_file
+from fuzzywuzzy import fuzz
+import glob
 from imdb import IMDb
 import json
+import matplotlib
+import matplotlib.pyplot as plt
 import operator
 import os
 import pandas as pd
+import random
 import re
 from textblob import TextBlob, Word, Blobber 
 from sklearn.feature_extraction.text import TfidfVectorizer
+import wikipedia
 from wordcloud import WordCloud
-import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 
-ia = IMDb()
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+matplotlib.use('Agg')
+
+ia = IMDb() # to create an imdb instance from which we will be collecting data throughout 
+
 cwd = os.getcwd()
-path_to_database = (os.path.join(cwd, "database.txt"))
+
+# to open movie database
+path_to_database = (os.path.join(cwd, "database_new.txt"))
 #path_to_database = "/Users/asnafatimaali/Desktop/STEVENS/FE595/Midterm_extra/database.txt"   # PATH TO DATABASE 
 with open(path_to_database, 'r') as file:
     data_base = json.loads(file.read())
 
-numbers = {"one|1|I":"one|1|I", "two|2|II":"two|2|II", "three|3|III":"three|3|III",
-"four|4|IV":"four|4|IV", "five|5|V":"five|5|V", "six|6|VI":"six|6|VI",
-"seven|7|VII":"seven|7|VII", "eight|8|VIII":"eight|8|VIII", "nine|9|IX":"nine|9|IX",
-"ten|10|X":"ten|10|X"}
-number_list = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "one", "two", "three",
-"four", "five", "six", "seven", "eight", "nine", "ten","i", "ii", "iii", "iv", "v", "vi",
-"vii", "viii", "ix", "x"]
+# to open dictionary of actors and their corresponding ids from imdb
+path_to_actorids = (os.path.join(cwd, "actor_ids.txt"))
+with open(path_to_actorids, 'r') as file:
+    actor_ids = json.loads(file.read())
 
+# to open dictionary where the actor id is key and the list of movies they 
+# were in base on our database are values
+path_to_actorinmovies = (os.path.join(cwd, "actor_in_movies.txt"))
+with open(path_to_actorinmovies, 'r') as file:
+    actors_in_movies = json.loads(file.read())
 
-def top_match(finds):
-    return max(set(finds), key=finds.count)
+# to open csv in which we only keep the movie reviews calculated and the 
+#group number from the kmeans analysis 
+movie_data = pd.read_csv(os.path.join(cwd, "movie_data.csv"))# this needs to go up
+movie_data = movie_data[["movie_id", "reviews", "group"]] # this needs to go up
+movie_data.set_index('movie_id', inplace=True)
 
+# this is partial path to the word cloud images 
+path_to_cloud = os.path.join(cwd, "static","images")
 
+# this is a function to clean the synopsis once we get it from imdb
 def info_cleaner(movie_synopsis):
     movie_synopsis = re.sub(r'[^\w\s\'\/]', " ", movie_synopsis) # remove everything that is not an alphanumeric and space
     movie_synopsis = re.sub(r" \'", "", movie_synopsis) # this will remove quotes that are not used as apostrophes
@@ -42,29 +61,32 @@ def info_cleaner(movie_synopsis):
     movie_synopsis = re.sub(r"^[ \t]+|[ \t]+$", "", movie_synopsis) # remove trailing and leading spaces 
     return movie_synopsis
 
+# this function is used to get the movie id from our data base from the title 
+# inputted by the user
+def getting_movie_id(nam):
+    value_holder = 0
+    closest_movie = ""
+    for names in data_base:
+        score = fuzz.ratio(nam, names)
+        if score > value_holder:
+            value_holder = score
+            closest_movie = names
+    return data_base[closest_movie]
+
+# to get the synopis from the the id
 def movie_selection(user_input):
     user_input = re.sub(r'[^\w\s]', " ",user_input)
     user_input = re.sub(r" +" , " ", user_input)
     user_input = TextBlob(user_input)
-    movie_finder = []
-    for token in user_input.words:
-        if token.lower() in number_list:
-            for num, number in numbers.items():
-                if re.search(token, num, re.IGNORECASE):
-                    token = number
-        for key, value in data_base.items():
-            if re.search(token,key, re.IGNORECASE):
-                movie_finder.append(value)
-    if len(movie_finder) == 0:
-        movie_info = "ERROR"
-    else:
-        max_id = top_match(movie_finder)
-        movie_info = ia.get_movie(max_id)
-        movie_info = movie_info['synopsis']
-        movie_info = str(movie_info)
-        movie_info = info_cleaner(movie_info)
+    closest_match = getting_movie_id(user_input)
+    movie_info = ia.get_movie(closest_match)
+    movie_info = movie_info['synopsis']
+    movie_info = str(movie_info)
+    movie_info = info_cleaner(movie_info)
     return movie_info
 
+# dictionary used in our services to get the keys in which we use to convert synopsis to another language
+# this is from textblobs website
 language = dict([('ab', 'Abkhaz'),
     ('aa', 'Afar'),('af', 'Afrikaans'),('ak', 'Akan'),('sq', 'Albanian'),('am', 'Amharic'),('ar', 'Arabic'),
     ('an', 'Aragonese'),('hy', 'Armenian'),('as', 'Assamese'),('av', 'Avaric'),('ae', 'Avestan'),('ay', 'Aymara'),
@@ -91,7 +113,7 @@ language = dict([('ab', 'Abkhaz'),
     ('ps', 'Pashto, Pushto'),('pt', 'Portuguese'),('qu', 'Quechua'),('rm', 'Romansh'),('rn', 'Kirundi'),
     ('ro', 'Romanian, Moldavan'),('ru', 'Russian'),('sa', 'Sanskrit (Saṁskṛta)'),('sc', 'Sardinian'),('sd', 'Sindhi'),
     ('se', 'Northern Sami'),('sm', 'Samoan'),('sg', 'Sango'),('sr', 'Serbian'),('gd', 'Scottish Gaelic'),('sn', 'Shona'),
-    ('si', 'Sinhala, Sinhalese'),('sk', 'Slovak'),('sl', 'Slovene'),('so', 'Somali'),('st', 'Southern Sotho'),('es', 'Spanish; Castilian'),
+    ('si', 'Sinhala, Sinhalese'),('sk', 'Slovak'),('sl', 'Slovene'),('so', 'Somali'),('st', 'Southern Sotho'),('es', 'Spanish'), ('es', 'Castilian'),
     ('su', 'Sundanese'),('sw', 'Swahili'),('ss', 'Swati'),('sv', 'Swedish'),('ta', 'Tamil'),('te', 'Telugu'),('tg', 'Tajik'),
     ('th', 'Thai'),('ti', 'Tigrinya'),('bo', 'Tibetan'),('tk', 'Turkmen'),('tl', 'Tagalog'),('tn', 'Tswana'),('to', 'Tonga'),
     ('tr', 'Turkish'),('ts', 'Tsonga'),('tt', 'Tatar'),('tw', 'Twi'),('ty', 'Tahitian'),('ug', 'Uighur, Uyghur'),
@@ -118,13 +140,14 @@ stopwords_list = ['a','about','above','after','again','against','ain','all','am'
 "wouldn't",'y','you',"you'd","you'll","you're","you've",'your','yours','yourself',
 'yourselves']
 
-
+# a list of happy words and it's synonyms which will be used in cosine similarity 
 happy_list = ["overjoy","cheerful", "happy","content", "delighted", "delight","ecstatic", "elated","glad", "joyful","joyous","joy", 
 "jubilant", "lively", "merry","overjoyed","peaceful","pleasant", "pleased","thrilled", "upbeat","blessed","blest","blissful", "blithe",
 "captivated", "chipper", "chirpy","convivial", "exultant", "gay","gleeful", "gratified","intoxicated", "light", "peppy","perky", "sparkling", 
 "sunny","tickled", "up", "satisfy"]
 happy_list = " ".join(happy_list)
 
+# a list of sad words and it's synonyms which will be used in cosine similarity 
 sad_list = ["bitter", "dismal", "melancholy", "mournful", "somber","wistful", "low", 
 "morose", "bereaved", "wistful", "sorry", "doleful", "heartsick", "hurting","gloomy", "blue","weeping"
 "dejected","sad", "irritate","lousy","upset","incapable","disappointment","doubtful","alone",
@@ -140,35 +163,40 @@ sad_list = ["bitter", "dismal", "melancholy", "mournful", "somber","wistful", "l
 "grieve","shaky","victim","mourn","restless","heartbroken","dismay","doubt","agony","threaten","coward","humiliate","alienate","wary"]
 sad_list = " ".join(sad_list)
 
+# a list of scary words and it's synonyms which will be used in cosine similarity 
 scary_list = ["alarm", "torture", "morbid", "tragic", "distrustful", "enraged", "provoke", "bad", "alarming", "chilling", "creepy", 
 "eerie", "horrifying", "horrify", "intimidating", "shocking", "spooky", "shock", "bloddcurdling", "panic"
 "horrendous", "gore", "unnerving" "frightening",  "daunting", "blood", "carnage", "slaughter", "evil", "paralyze", "dark"]
 scary_list = " ".join(scary_list)
 
+# a list of romance words and it's synonyms which will be used in cosine similarity 
 romantic_list = ["amorous", "charming", "corny", "dreamy", "erotic", "exciting", "exotic", "fanciful", "glamorous", "passionate", "tender", 
 "chivalrous", "fond", "pituresque", "loving", "idyllic", 'heart','lovely', 'family','caring','forever','trust','passion','romance','sweet',
 'kiss','love','hugs','warm','fun','kisses','joy','friendship','marriage','husband','wife','forever']
 romantic_list = " ".join(romantic_list)
 
+# a list of mystery words and it's synonyms which will be used in cosine similarity 
 mystery_list =["suspicious", "baffling", "cryptic", "curious", "enigmatic", "inexplicable", "mystical", "obscure", "perplexing", "puzzling", "mysterious", "mystery"
 "secretive", "weird", "abstruse", "arcane", "covert", "hidden", "impenetrable", "strange", "unknown", "insoluble", "incomprehensible", "furtive", "difficult", 
 "necromantic", "occult", "oracular", "recondite", 'spiritual', "subjective", "symbolic", 'uncanny', "transcendental", "unfathomable", "unknowable", "unnatural", "veiled"]
 mystery_list = " ".join(mystery_list)
 
+# a list of funny words and it's synonyms which will be used in cosine similarity 
 comedy_list = ["absurd", "amusing", "droll", "entertaining", "hilarious", "ludicrous", "playful", "ridiculous", "silly", "whimsical", "antic", "slapstick", "farcical",
 "jolly", "laughable", "mirthful", "priceless", "riotous", "waggish", "witty", "joke", "comedy", "comedic", "comedians"]
 comedy_list = " ".join(comedy_list)
 
 vectorization = TfidfVectorizer()
 
+# calculating cosine similarity with a sparse matrix
 def cosine_similarity(input1, input2):
     tfidf = vectorization.fit_transform([input1, input2])
     return ((tfidf * tfidf.T).A)[0,1]
 
+
 @app.route('/', methods =['GET', 'POST'])
 def homepage():
     return render_template('services.html')
-
 
 @app.route('/service1', methods = ["GET", "POST"])
 def service1():
@@ -178,6 +206,7 @@ def service1():
     else:
         return render_template('one.html')
 
+# this service gets the sentiment score of the movies. 
 @app.route('/service1_result', methods = ['GET', 'POST'])
 def service1_result():
     user_input1 = request.form['text']
@@ -203,6 +232,8 @@ def service2():
     else:
         return render_template('two.html')
 
+# this service is used to translate the synopsis in the langauage the user inputted
+# of a movie of their own choosing
 @app.route('/service2_result', methods = ['GET', "POST"])
 def service2_result():
     user_input1 = request.form['text']
@@ -239,6 +270,7 @@ def service3():
     else:
         return render_template('three.html')
 
+# this service is used to get the similarity score between two movies
 @app.route('/service3_result', methods = ['GET', 'POST'])
 def service3_result():
     user_input1 = request.form['text']
@@ -277,12 +309,11 @@ def service4():
     else:
         return render_template('four.html')
 
-
+# this service is used to get the similarity between a movie and the emotion inputted
 @app.route('/service4_result', methods = ['GET', 'POST'])
 def service4_result():
     user_input1 = request.form['text']
     user_input2 = request.form['text2']
-
 
     def mood_similarity(user_movie_input, mood_input):
         if movie_selection(user_movie_input) == "ERROR":
@@ -319,6 +350,7 @@ def service5():
     else:
         return render_template('five.html')  
 
+# to get top noun phrases 
 @app.route('/service5_result', methods = ['GET', 'POST'])
 def service5_result():
     user_input1 = request.form['text']
@@ -360,7 +392,7 @@ def service6():
     else:
         return render_template('six.html')  
 
-
+# to get adjectives 
 @app.route('/service6_result', methods = ['GET', "POST"])
 def service6_result():
 
@@ -397,93 +429,98 @@ def service6_result():
     return render_template('present2.html', tables=[top_adjies.to_html(classes='data', header="true")])
 
 
+@app.route('/service7', methods = ['GET', "POST"])
+def service7():
+    render_template('seven.html')
+    if request.method == "POST":
+        return redirect(url_for('/service7_result'))
+    else:
+        return render_template('seven.html') 
+
+# to get the 20 0f the movies from the kmeans cluster group. 
+# from the test only six groups were created, with hundreds of movies in each
+# as a result we decided to output only 20, which will be selected randomly after
+# each user input from the group in which their inputted movie belongs
 @app.route('/service7_result', methods = ['GET', "POST"])
-def service6_result():
-    df = pd.read_csv('movie_data.csv')
-    df = pd.DataFrame(df)
-    df = df.drop(['Unnamed: 0'], axis=1)
-    user_input = input('enter movie name')
-    search = df.loc[df['title'] == user_input]
-    print('movie belongs to category', search['group'])
-    movie_category = int(input('enter category of selected movie'))
-    print('similar movies',df.loc[df['group'] == movie_category])
-    
+def service7_result():
+    user_input1 = request.form['text']
 
+    def get_suggestion(user_input1):
+        user_movie_id = getting_movie_id(user_input1)
+        group = movie_data.group[int(user_movie_id)] 
+        num_match = movie_data.loc[movie_data.group == group]
+        rand20 = num_match.sample(n=20)
+        suggested_titles = []
+        for x in rand20.index.values:
+            suggested_titles.extend([key for key, value in data_base.items() if int(value) == x])
+        return suggested_titles
 
+    suggested_output = get_suggestion(user_input1)
+    return render_template('present5.html', the_list = suggested_output, output = "")
+
+@app.route('/service8', methods = ['GET', 'POST'])
+def service8():
+    render_template('eight.html')
+    if request.method == "POST":
+        return redirect(url_for('/service8_result'))
+    else:
+        return render_template('eight.html')  
+
+# this service creates word clouds of the top frequent adjectives used in the user
+# reviews, we believed it gave a stronger indication of what the users were talking about
 @app.route('/service8_result', methods = ['GET', "POST"])
-def service6_result():
+def service8_result():
 
-#Input: change this movie_id for test purpose
-movie_id = 417741
+    user_input1 = request.form['text']
+    user_movie_id = getting_movie_id(user_input1)
 
+    for pngpath in glob.iglob(os.path.join(path_to_cloud, '*.png')):
+        os.remove(pngpath)
 
-#calculate sentiment polarity
-def detect_polarity(reviews):
-    return TextBlob(reviews).sentiment.polarity
+    #calculate sentiment polarity
+    def detect_polarity(reviews):
+        return TextBlob(reviews).sentiment.polarity
 
-#get movie index from movie ID 
-def get_movie_index(movie_id):
-    idx = 0 
-    x = 0
-    y = 0
-    
-    for id in reviews_data.movie_id:
-        if(id == movie_id):
-            break
-        else:
-            x = x + 1
-    return x
-    
-#Calculate sentiiment polarity of the movie based on reviews
-def get_movie_sentiment(movie_idx):
-    reviews = str(reviews_data.reviews[movie_idx]) 
-    mov_sentiment = detect_polarity(reviews)
-    return mov_sentiment
+    #Calculate sentiiment polarity of the movie based on reviews
+    def get_movie_sentiment(movie_idx):
+        reviews = str(movie_data.reviews[int(movie_idx)]) 
+        mov_sentiment = detect_polarity(reviews)
+        return mov_sentiment
 
-#Find top adjectives in the review
-def top_adjectives(movie_idx):
-    count = list()
-    adjectives = []
-    mov_adjectives = pd.DataFrame()
-    reviews = str(reviews_data.reviews[movie_idx])
-    blob = TextBlob(reviews)
-    
-    for word, pos in blob.tags:
-        if pos =='JJ':
-            adjectives.append(word)
+    #Find top adjectives in the review
+    def top_adjectives(movie_idx):
+        count = list()
+        adjectives = []
+        mov_adjectives = pd.DataFrame()
+        reviews = str(movie_data.reviews[int(movie_idx)])
+        blob = TextBlob(reviews)
+        
+        for word, pos in blob.tags:
+            if pos =='JJ':
+                adjectives.append(word)
 
-    for i in range(0, len(adjectives)):
-        count.append(adjectives.count(adjectives[i]))
+        for i in range(0, len(adjectives)):
+            count.append(adjectives.count(adjectives[i]))
 
-    mov_adjectives['Adjectives'] = adjectives
-    mov_adjectives['Frequency'] = count
-    sorted_adj = mov_adjectives.sort_values('Frequency', ascending = False)
-    return sorted_adj
+        mov_adjectives['Adjectives'] = adjectives
+        mov_adjectives['Frequency'] = count
+        sorted_adj = mov_adjectives.sort_values('Frequency', ascending = False)
+        return sorted_adj
 
-#generate word cloud
-def word_cloud(text):        
-    wc = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(text)
-    plt.figure()
-    plt.imshow(wc, interpolation="bilinear")
-    plt.axis("off")
-    return plt.show()
+    #generate word cloud
+    def word_cloud(text):        
+        wc = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(text)
+        plt.figure()
+        plt.imshow(wc, interpolation="bilinear")
+        plt.axis("off")
+        path_to_pic = "{}.png".format(random.randint(1,10000))
+        plt.savefig(os.path.join(path_to_cloud, path_to_pic))
+        return path_to_pic
 
-
-if __name__ == "__main__":
-    movie_index = 0
-    mov_sentiment_val = 0.0
-    movie_adj = []
-    movie_data = pd.read_csv('movie_data.csv')
-    reviews_data = movie_data[["movie_id", "reviews", "rating_votes","movie_rating"]]
-    
-    
-    movie_index = get_movie_index(movie_id)
-    print("movie index = " + str(movie_index))
-    
-    mov_sentiment_val = get_movie_sentiment(movie_index)
-    print("movie sentiment polarity = " + str(mov_sentiment_val))
-    
-    mov_adjective = top_adjectives(movie_index)
+  
+    mov_sentiment_val = get_movie_sentiment(user_movie_id)
+ 
+    mov_adjective = top_adjectives(user_movie_id)
 
     #update adjective items based on the overall polarity of the movie
     mov_adjective['polarity'] = mov_adjective.Adjectives.apply(detect_polarity) #add polarity column to include polarity of all the adjectives
@@ -499,17 +536,64 @@ if __name__ == "__main__":
     else: 
         updated_adj = mov_adjective[mov_adjective.polarity == 0]
         
-    print(updated_adj)
     #Output of adjective word cloud
-    word_cloud(str(updated_adj.Adjectives))
+    output_cloud = word_cloud(str(updated_adj.Adjectives))
 
-    
+    return render_template('present4.html', output = output_cloud )
 
 
+@app.route('/service9', methods = ['GET', 'POST'])
+def service9():
+    render_template('nine.html')
+    if request.method == "POST":
+        return redirect(url_for('/service9_result'))
+    else:
+        return render_template('nine.html')  
+
+# this service gets a list of the movies, restricted to our database, that the user inputted 
+# actor was in. The Wikipedia api is also used to get the image of the actor if they have their 
+# own page, the pictures represented are based on the first link from the list that end in
+# jpg. As a result, some pictures contain additional people
 @app.route('/service9_result', methods = ['GET', "POST"])
-def service6_result():
+def service9_result():
+    user_input1 = request.form['text']
 
+    def actor_pic(nam):
+        wiki_page = wikipedia.page(nam)
+        display_image = ""
+        if fuzz.ratio(nam.lower(), wiki_page.title.lower()) >= 80:
+            images = wiki_page.images
+            for image in images:
+                if image[-3:] == "jpg":
+                    display_image = image
+                    break
+        else:
+            display_image = "/static/unavailable.png"
+        return display_image
 
+    def actin_movies(nam):
+        value_holder = 0
+        actor_name = ""
+
+        for acts in actor_ids:
+            score = fuzz.ratio(nam, acts)
+            if score > value_holder:
+                value_holder = score
+                actor_name = acts
+        act_id = actor_ids[actor_name]
+
+        movies_in = actors_in_movies[act_id]
+
+        movies_in_title = []
+        for inmovie in movies_in:
+            movies_in_title.extend([key for key, value in data_base.items() if value == inmovie])
+
+        return movies_in_title
+
+    pic = actor_pic(user_input1)
+    movie_output = actin_movies(user_input1)
+
+    return render_template('present3.html', the_list = movie_output, output = pic)
 
 
 if __name__ == "__main__":
