@@ -13,6 +13,7 @@ import pandas as pd
 import random
 import re
 from textblob import TextBlob, Word, Blobber 
+import shutil
 from sklearn.feature_extraction.text import TfidfVectorizer
 import wikipedia
 from wordcloud import WordCloud
@@ -475,7 +476,8 @@ def service8_result():
     user_movie_id = getting_movie_id(user_input1)
 
     for pngpath in glob.iglob(os.path.join(path_to_cloud, '*.png')):
-        os.remove(pngpath)
+        shutil.rmtree(pngpath)
+        #os.remove(pngpath)
 
     #calculate sentiment polarity
     def detect_polarity(reviews):
