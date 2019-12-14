@@ -18,10 +18,9 @@
       }
    </style>
    <body class="w3-light-grey w3-content" style="max-width:1600px">
-
       <header class="bgimg-1 w3-display-container w3-opacity-min" id="home">
          <div class="w3-display-middle" style="white-space:nowrap;">
-           <a href = "/"> <span class="w3-center w3-padding-large w3-black w3-xlarge w3-wide w3-animate-opacity"> MOVIE <span class="w3-hide-small">WEB</span> SERVICE</span> </a>
+            <a href = "/"> <span class="w3-center w3-padding-large w3-black w3-xlarge w3-wide w3-animate-opacity"> MOVIE <span class="w3-hide-small">WEB</span> SERVICE</span> </a>
          </div>
       </header>
       <center>
@@ -36,14 +35,12 @@
       <div class="w3-row-padding">
          <div class="w3-third w3-container w3-margin-bottom">
             <a href="{{url_for('service1')}}">
-               <img src="/static/polarity.png" alt="Polarity" width="455"  height="350" class="w3-hover-opacity">     </a>
-               <div class="w3-container w3-white">
-                  <p><b>Movie Polarity</b></p>
-                  <p>Type in a title and see if the movie is positive, negative or bleh -_- </p>
-               </div>
-        
+            <img src="/static/polarity.png" alt="Polarity" width="455"  height="350" class="w3-hover-opacity">     </a>
+            <div class="w3-container w3-white">
+               <p><b>Movie Polarity</b></p>
+               <p>Type in a title and see if the movie is positive, negative or bleh -_- </p>
+            </div>
          </div>
-
          <div class="w3-third w3-container w3-margin-bottom">
             <a href="{{url_for('service2')}}">
             <img src="/static/languages_switcher.gif" alt="Language" width="455"  height="350" class="w3-hover-opacity"> </a>
@@ -51,11 +48,9 @@
                <p><b>Language Switch</b></p>
                <p>Know another language? Wan't to show off? Type it in and we'll give you the synopsis in that vernacular.</p>
             </div>
-
          </div>
-
          <div class="w3-third w3-container">
-<a href="{{url_for('service3')}}">
+            <a href="{{url_for('service3')}}">
             <img src="/static/same.gif" alt="Similarity"  width="455"  height="350" class="w3-hover-opacity"> </a>
             <div class="w3-container w3-white">
                <p><b>Movie Similarity</b></p>
@@ -65,7 +60,7 @@
       </div>
       <div class="w3-row-padding">
          <div class="w3-third w3-container w3-margin-bottom">
-<a href="{{url_for('service4')}}">
+            <a href="{{url_for('service4')}}">
             <img src="/static/emotions.gif" alt="Mood" width="455"  height="350" class="w3-hover-opacity"> </a>
             <div class="w3-container w3-white">
                <p><b>Movie Mood</b></p>
@@ -73,7 +68,7 @@
             </div>
          </div>
          <div class="w3-third w3-container w3-margin-bottom">
-<a href="{{url_for('service5')}}">
+            <a href="{{url_for('service5')}}">
             <img src="/static/nouns.jpg" alt="Noun" width="455"  height="350" class="w3-hover-opacity"> </a>
             <div class="w3-container w3-white">
                <p><b>Top Noun Phrases</b></p>
@@ -81,7 +76,7 @@
             </div>
          </div>
          <div class="w3-third w3-container">
-<a href="{{url_for('service6')}}">
+            <a href="{{url_for('service6')}}">
             <img src="/static/adjectives.jpg" alt="Adjectives"  width="455"  height="350" class="w3-hover-opacity"> </a>
             <div class="w3-container w3-white">
                <p><b>Top Adjectives</b></p>
@@ -91,23 +86,23 @@
       </div>
       <div class="w3-row-padding">
          <div class="w3-third w3-container w3-margin-bottom">
-<a href="{{url_for('service7')}}">
+            <a href="{{url_for('service7')}}">
             <img src="/static/end.gif" alt="Suggestions" width="455"  height="350" class="w3-hover-opacity"> </a>
             <div class="w3-container w3-white">
                <p><b>Movie Recommender</b></p>
-               <p>Did your movie end? Want to watch something similar? Type in the title of what you watched and we'll recommend twenty  similar titles from our database based on clusters created with Kmeans. </p>
+               <p>Did your movie end? Want to watch something similar? Type in the title of what you watched and we'll recommend twenty similar from our database based on clusters created with Kmeans. </p>
             </div>
          </div>
          <div class="w3-third w3-container w3-margin-bottom">
-<a href="{{url_for('service8')}}">
+            <a href="{{url_for('service8')}}">
             <img src="/static/wordcloud.gif" alt="Cloud" width="455"  height="350" class="w3-hover-opacity"> </a>
             <div class="w3-container w3-white">
                <p><b>Word Clouds of User Reviews</b></p>
-               <p>Want to know what others are saying about the movie? Type in a title and we'll give you a word cloud of the most frequent adjectives used user reviews.</p>
+               <p>Want to know what others are saying about the movie? Type in a title and we'll give you a word cloud of the reviews and the most frequent adjectives used in user reviews.</p>
             </div>
          </div>
          <div class="w3-third w3-container">
-<a href="{{url_for('service9')}}">
+            <a href="{{url_for('service9')}}">
             <img src="/static/forgot.gif" alt="Actors"  width="455"  height="350" class="w3-hover-opacity"> </a>
             <div class="w3-container w3-white">
                <p><b>Actor In Movies</b></p>
@@ -116,4 +111,4 @@
          </div>
       </div>
    </body>
-</html>
+</html>
