@@ -13,16 +13,15 @@ import pandas as pd
 import random
 import re
 from textblob import TextBlob, Word, Blobber 
-import shutil
 from sklearn.feature_extraction.text import TfidfVectorizer
 import wikipedia
 from wordcloud import WordCloud
 
 app = Flask(__name__)
 
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-app.config["CACHE_DEFAULT_TIMEOUT"] = 0
-matplotlib.use('Agg')
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0 # Max age for the defailt cache to be zero seconds
+app.config["CACHE_DEFAULT_TIMEOUT"] = 0 # chase timeout within zero seconds. 
+matplotlib.use('Agg') # to get output for matplot lib
 
 ia = IMDb() # to create an imdb instance from which we will be collecting data throughout 
 
@@ -73,7 +72,11 @@ def getting_movie_id(nam):
         if score > value_holder:
             value_holder = score
             closest_movie = names
-    return data_base[closest_movie]
+    if value_holder > 20:
+        return data_base[closest_movie]
+    else: 
+        return "ERROR"
+    
 
 # to get the synopis from the the id
 def movie_selection(user_input):
@@ -81,10 +84,16 @@ def movie_selection(user_input):
     user_input = re.sub(r" +" , " ", user_input)
     user_input = TextBlob(user_input)
     closest_match = getting_movie_id(user_input)
-    movie_info = ia.get_movie(closest_match)
-    movie_info = movie_info['synopsis']
-    movie_info = str(movie_info)
-    movie_info = info_cleaner(movie_info)
+    if closest_match == "ERROR":
+        movie_info = "ERROR"
+    else:
+        try:
+            movie_info = ia.get_movie(closest_match)
+            movie_info = movie_info['synopsis']
+            movie_info = str(movie_info)
+            movie_info = info_cleaner(movie_info)
+        except KeyError:
+            movie_info = "ERROR"
     return movie_info
 
 # dictionary used in our services to get the keys in which we use to convert synopsis to another language
@@ -211,6 +220,7 @@ def service1():
 # this service gets the sentiment score of the movies. 
 @app.route('/service1_result', methods = ['GET', 'POST'])
 def service1_result():
+
     user_input1 = request.form['text']
 
     def get_sentiment(user_movie_input):
@@ -221,10 +231,38 @@ def service1_result():
             blob = TextBlob(text)
             for sentence in blob.sentences:
                 text_sentiment = sentence.sentiment.polarity
+            # Depending on the polarity the color of the text will change
+            if float(text_sentiment) < -0.5: 
+                text_sentiment = "The score is {}. Which means the polarity is:".format(text_sentiment)
+                pols = "NEGATIVE"
+                col1 = 122
+                col2 = 0
+            elif 0 > float(text_sentiment) >= -0.5:
+                text_sentiment = "The score is {}. Which means the polarity is:".format(text_sentiment)
+                pols = "SLIGHTLY NEGATIVE"
+                col1 = 204
+                col2 = 0
+            elif float(text_sentiment) == 0:
+                text_sentiment = "The score is {}. Which means the polarity is:".format(text_sentiment)
+                pols = "NEUTRAL"
+                col1 = 206
+                col2 = 206
+            elif 0.5 > float(text_sentiment) > 0:
+                text_sentiment = "The score is {}. Which means the polarity is:".format(text_sentiment)
+                pols = "SLIGHTLY POSITIVE"
+                col1 = 82
+                col2 = 164
+            elif 0.5 > float(text_sentiment) > 0:
+                text_sentiment = "The score is {}. Which means the polarity is:".format(text_sentiment)
+                pols = "POSITIVE"
+                col1 = 120
+                col2 = 241
         
-        return (text_sentiment)
-    movie_sentiment = get_sentiment(user_input1)
-    return render_template('present.html', output = movie_sentiment)
+        return text_sentiment, pols, col1, col2
+
+    movie_sentiment, pol, coll1, coll2 = get_sentiment(user_input1)
+
+    return render_template('present1.html', output = movie_sentiment, pols = pol, col1 = coll1, col2 = coll2)
 
 @app.route('/service2',methods = ['GET', "POST"])
 def service2():
@@ -295,12 +333,32 @@ def service3_result():
 
     movie1 = lemmatize_sentence(movie_selection(user_input1))
     movie2 = lemmatize_sentence(movie_selection(user_input2))
-    if movie1 == "ERROR" or movie2 == "ERROR":
-        score = "Cannot Calculate the Similarity between these movies. Please Enter Another Title."
-    else:
-        score = cosine_similarity(movie1, movie2)
-        score = str(score)
-    return render_template('present.html', output = score)
+
+    def scoring_movies (movie1, movie2):
+        if movie1 == "ERROR" or movie2 == "ERROR":
+            output = "Cannot Calculate the Similarity between these movies. Please Enter Another Title."
+            wording = ""
+            ending_sent= ""
+        else:
+            score = cosine_similarity(movie1, movie2)
+            if 0 <= float(score) < 0.4:
+                output = "The movies are" 
+                wording = "OPPOSITES"
+                ending_sent = "because the score is {}".format(score)
+            elif 0.4 <= float(score) <0.7: 
+                output = "The movies are"
+                wording = "NOT REALLY RELATED"
+                ending_sent = "because the score is {}".format(score)
+            elif 0.7 <= float(score) <= 1:
+                output = "The movies are"
+                wording = "VERY SIMILAR"
+                ending_sent = "because the score is {}".format(score)
+        return output, wording, ending_sent
+
+    output, wording, ending_sent = scoring_movies(movie1, movie2)        
+        #score = str(score)
+
+    return render_template('present6.html', output = output, exp = wording, ending_sent = ending_sent)
 
 
 @app.route('/service4', methods = ['GET', 'POST'])
@@ -317,32 +375,58 @@ def service4_result():
     user_input1 = request.form['text']
     user_input2 = request.form['text2']
 
+        # to calculate the expression needed to be displayed for service 4
+    def expression(mood_num):
+        if mood_num == "ERROR":
+            wording = ""
+            ending_sent = ""
+        else:
+            if 0 <= float(mood_num) < 0.4:
+                wording = "OPPOSITE"
+                ending_sent = "of the mood/emotion entered."
+            elif 0.4 <= float(mood_num) <0.7: 
+                wording = "SOMEWHAT"
+                ending_sent = "of the mood/emotion entered."
+            elif 0.7 <= float(mood_num) <= 1:
+                wording = "EPITOME"
+                ending_sent = "of the mood/emotion entered."
+        return wording, ending_sent
+
     def mood_similarity(user_movie_input, mood_input):
         if movie_selection(user_movie_input) == "ERROR":
             service_output = "Cannot Calculate the Mood of this Movie, please enter another title"
+            mood_num = "ERROR"
         else:
             user_movie_input = movie_selection(user_movie_input)
             mood_input = str(mood_input)
             if mood_input in happy_list:
-                service_output = "The cosine score of this being a happy movie is {}".format(cosine_similarity(user_movie_input, happy_list))
+                mood_num = cosine_similarity(user_movie_input, happy_list)
+                service_output = "The cosine score of this being a happy movie is {}. Which is".format(mood_num)
             elif mood_input in sad_list:
-                service_output = "The cosine score of this being a sad movie is {}".format(cosine_similarity(user_movie_input, sad_list))
+                mood_num = cosine_similarity(user_movie_input, sad_list)
+                service_output = "The cosine score of this being a sad movie is {}. Which is".format(mood_num)
             elif mood_input in scary_list:
-                service_output = "The cosine score of this being a scary movie is {}".format(cosine_similarity(user_movie_input, scary_list))
+                mood_num = cosine_similarity(user_movie_input, scary_list)
+                service_output = "The cosine score of this being a scary movie is {}. Which is".format(mood_num)
             elif mood_input in mystery_list:
-                service_output = "The cosine score of this being a mysterious movie is {}".format(cosine_similarity(user_movie_input, mystery_list))
+                mood_num = cosine_similarity(user_movie_input, mystery_list)
+                service_output = "The cosine score of this being a mysterious movie is {}. Which is".format(mood_num)
             elif mood_input in romantic_list:
-                service_output = "The cosine score of this being a romantic movie is {}".format(cosine_similarity(user_movie_input, romantic_list))
+                mood_num = cosine_similarity(user_movie_input, romantic_list)
+                service_output = "The cosine score of this being a romantic movie is {}. Which is".format(mood_num)
             elif mood_input in comedy_list:
-                service_output = "The cosine score of this being a comedic movie is {}".format(cosine_similarity(user_movie_input, comedy_list))
+                mood_num = cosine_similarity(user_movie_input, comedy_list)
+                service_output = "The cosine score of this being a comedic movie is {}. Which is".format(mood_num)
             else:
                 service_output = "Please enter another mood, or a synonym variation."
-        return(service_output)
+                mood_num = "ERROR"
 
-    mood_score = mood_similarity(user_input1, user_input2)
+        return service_output, mood_num
+    mood_score, exp_mood = mood_similarity(user_input1, user_input2)
     mood_score = str(mood_score)
+    exp_mood, ending_sent = expression(exp_mood)
 
-    return render_template('present.html', output = mood_score)
+    return render_template('present6.html', output = mood_score, exp = exp_mood, ending_sent = ending_sent)
 
 @app.route('/service5', methods = ['GET', 'POST'])
 def service5():
@@ -468,17 +552,13 @@ def service8():
     else:
         return render_template('eight.html')  
 
-# this service creates word clouds of the top frequent adjectives used in the user
+# this service creates word clouds of the user review and the top frequent adjectives used in the user
 # reviews, we believed it gave a stronger indication of what the users were talking about
 @app.route('/service8_result', methods = ['GET', "POST"])
 def service8_result():
 
     user_input1 = request.form['text']
     user_movie_id = getting_movie_id(user_input1)
-
-    #for pngpath in glob.iglob(os.path.join(path_to_cloud, '*.png')):
-        #shutil.rmtree(pngpath)
-        #os.remove(pngpath)
 
     #calculate sentiment polarity
     def detect_polarity(reviews):
@@ -511,13 +591,17 @@ def service8_result():
         return sorted_adj
 
     #generate word cloud
-    def word_cloud(text):        
+    def word_cloud(text, num):        
         wc = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(text)
         plt.figure()
         plt.imshow(wc, interpolation="bilinear")
         plt.axis("off")
-        #path_to_pic = "{}.png".format(random.randint(1,10000))
-        path_to_pic = "wordcloud.png"
+        if num == 1:
+            path_to_pic = "wordcloud.png"
+
+        elif num == 2:
+            path_to_pic = "wordcloud1.png"
+
         plt.savefig(os.path.join(path_to_cloud, path_to_pic))
         return path_to_pic
 
@@ -541,9 +625,10 @@ def service8_result():
         updated_adj = mov_adjective[mov_adjective.polarity == 0]
         
     #Output of adjective word cloud
-    output_cloud = word_cloud(str(updated_adj.Adjectives))
+    output_cloud = word_cloud(str(updated_adj.Adjectives), 1)
+    output_cloud2 = word_cloud(str(movie_data.reviews[int(user_movie_id)]),2 )
 
-    return render_template('present4.html', output = output_cloud )
+    return render_template('present4.html', output = output_cloud , output2 = output_cloud2)
 
 
 @app.route('/service9', methods = ['GET', 'POST'])
@@ -563,17 +648,24 @@ def service9_result():
     user_input1 = request.form['text']
 
     def actor_pic(nam):
-        wiki_page = wikipedia.page(nam)
-        display_image = ""
-        if fuzz.ratio(nam.lower(), wiki_page.title.lower()) >= 80:
-            images = wiki_page.images
-            for image in images:
-                if image[-3:] == "jpg":
-                    display_image = image
-                    break
-        else:
+        try:
+            wiki_page = wikipedia.page(nam)
+            display_image = ""
+            if fuzz.ratio(nam.lower(), wiki_page.title.lower()) >= 80:
+                images = wiki_page.images
+                for image in images:
+                    if image[-3:] == "jpg":
+                        display_image = image
+                        break
+            else:
+                display_image = "/static/unavailable.png"
+        except wikipedia.exceptions.DisambiguationError: # for cases where the name has mnay ouputs 
             display_image = "/static/unavailable.png"
+        except wikipedia.exceptions.PageError: # if the image can't be found
+            display_image = "/static/unavailable.png"
+
         return display_image
+
 
     def actin_movies(nam):
         value_holder = 0
@@ -584,20 +676,26 @@ def service9_result():
             if score > value_holder:
                 value_holder = score
                 actor_name = acts
-        act_id = actor_ids[actor_name]
+                # threshold for fuzz score it is higher because there is a greater
+                # chance someone will type in actor name far more correctly as opposed to the 
+                # movie name 
+                if value_holder > 75: 
+                    act_id = actor_ids[actor_name]
+                    movies_in = actors_in_movies[act_id]
 
-        movies_in = actors_in_movies[act_id]
-
-        movies_in_title = []
-        for inmovie in movies_in:
-            movies_in_title.extend([key for key, value in data_base.items() if value == inmovie])
-
-        return movies_in_title
+                    movies_in_title = []
+                    for inmovie in movies_in:
+                        movies_in_title.extend([key for key, value in data_base.items() if value == inmovie])
+                    extra = ""
+                else: 
+                    extra = "Cannot Find Actor in Our Database of Movies"
+                    movies_in_title = []
+        return movies_in_title, extra
 
     pic = actor_pic(user_input1)
-    movie_output = actin_movies(user_input1)
+    movie_output, extra = actin_movies(user_input1)
 
-    return render_template('present3.html', the_list = movie_output, output = pic)
+    return render_template('present3.html', the_list = movie_output, output = pic, extra = extra)
 
 
 if __name__ == "__main__":
