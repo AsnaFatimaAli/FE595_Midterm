@@ -21,6 +21,7 @@ from wordcloud import WordCloud
 app = Flask(__name__)
 
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config["CACHE_DEFAULT_TIMEOUT"] = 0
 matplotlib.use('Agg')
 
 ia = IMDb() # to create an imdb instance from which we will be collecting data throughout 
@@ -475,8 +476,8 @@ def service8_result():
     user_input1 = request.form['text']
     user_movie_id = getting_movie_id(user_input1)
 
-    for pngpath in glob.iglob(os.path.join(path_to_cloud, '*.png')):
-        shutil.rmtree(pngpath)
+    #for pngpath in glob.iglob(os.path.join(path_to_cloud, '*.png')):
+        #shutil.rmtree(pngpath)
         #os.remove(pngpath)
 
     #calculate sentiment polarity
@@ -515,7 +516,8 @@ def service8_result():
         plt.figure()
         plt.imshow(wc, interpolation="bilinear")
         plt.axis("off")
-        path_to_pic = "{}.png".format(random.randint(1,10000))
+        #path_to_pic = "{}.png".format(random.randint(1,10000))
+        path_to_pic = "wordcloud.png"
         plt.savefig(os.path.join(path_to_cloud, path_to_pic))
         return path_to_pic
 
