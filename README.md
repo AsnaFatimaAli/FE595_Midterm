@@ -1,6 +1,6 @@
 # FE595_Midterm- NLP Web API Services
 
-This project is for creating a web API that will provide users with NLP data on moviessubmitted data. We have crated & deployed this application as a flask application.
+This project is for creating a web API that will provide users with NLP data on movies submitted data. We have created & deployed this application through Flask.
 
 # Getting Started
 
@@ -33,13 +33,23 @@ Install the following required libraries:
 ```
 pip3 install flask
 
+pip3 install fuzzywuzzy
+
+pip3 install imdbpy
+
+pip3 install matplotlib
+
+pip3 install pandas
+
 pip3 install textblob
 
 python3 -m textblob.download_corpora
 
-pip3 install pandas
-
 pip3 install sklearn
+
+pip3 install wikipedia
+
+pip3 install wordcloud
 ```
 We have made the code available in a git repo. Clone to repository and get the code
 ```
@@ -69,19 +79,26 @@ You can look at the application file using the base link - http://your specfic I
 
 Flask - The web framework used
 Git - Code management
-Textblob &sklearn - Used to create the NLP services
 
-# NLP Description Serivces
+# Description of Serivces
 
-Movie Sentiment: provides sentiment of the movie based on the polarity of the movie's synopsis.
+Movie Polarity: provides polarity of the movie based on the movie's synopsis.
 
-Synopsis Translation: allows translation of the synopsis to different languages.
+Language Switch: translates the synopsis to different languages.
 
-Cosine Similarity: compares how similar are two input movies.
+Movie Similarity: compares two movies using cosine similarity.
 
-Mood Similarity: computes how much of a mood specified the input movies is, and compares both.
+Mood Mood: Uses cosine similarity to compare a movie's synopsis to an inputted movie/emotion. 
 
-Count Noun: calculates the top noun phrases of a movie.
+Top Noun Phrases: calculates the top noun phrases of a movie.
 
-Adjectives: displays the top adjectives of a movie.
+Top Adjectives: displays the top adjectives of a movie.
+
+Movie Recommender: provides you with 20 movies similar to the movie inputted determined with kmeans.
+
+Word Clouds of User Reviews: Gives you a word of the user reviews. 
+
+Actor in Movie: Gives you a list of movies the actor has been in along with their picture.
+
+
 
